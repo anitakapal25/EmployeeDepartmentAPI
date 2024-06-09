@@ -2,10 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Repositories\EmployeeRepositoryInterface;
 use Illuminate\Http\Request;
+use App\Models\Employee;
+use Exception;
 
 class EmployeeController extends Controller
 {
+    protected $employeeRepository;
+
+    public function __construct(EmployeeRepositoryInterface $employeeRepository)
+    {
+        $this->employeeRepository = $employeeRepository;
+    }
+
     /**
      * Display a listing of the resource.
      *
@@ -13,7 +23,14 @@ class EmployeeController extends Controller
      */
     public function index()
     {
-        return response()->json(Employee::with(['department', 'contacts', 'addresses'])->get(), 200);
+        try {
+            $employees = $this->employeeRepository->all();
+            return response()->json($employees, 200);
+        } catch (Exception $e) {
+            \Log::error('Failed to retrieve employees: ' . $e->getMessage());
+            return response()->json(['error' => 'Internal server error'], 500);
+        }
+        //return response()->json(Employee::with(['department', 'contacts', 'addresses'])->get(), 200);
     }
 
     /**
@@ -24,28 +41,28 @@ class EmployeeController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'first_name' => 'required|max:255',
-            'last_name' => 'required|max:255',
-            'department_id' => 'required|exists:departments,id',
-            'contacts' => 'array',
-            'contacts.*.phone_number' => 'required|max:20',
-            'addresses' => 'array',
-            'addresses.*.address_line1' => 'required|max:255',
-            'addresses.*.city' => 'required|max:100',
-            'addresses.*.state' => 'required|max:100',
-            'addresses.*.zip' => 'required|max:20',
-        ]);
+        try {
+            $validated = $request->validate([
+                'first_name' => 'required|max:255',
+                'last_name' => 'required|max:255',
+                'department_id' => 'required|exists:departments,id',
+                'contacts' => 'array',
+                'contacts.*.phone_number' => 'required|max:20',
+                'addresses' => 'array',
+                'addresses.*.address_line1' => 'required|max:255',
+                'addresses.*.city' => 'required|max:100',
+                'addresses.*.state' => 'required|max:100',
+                'addresses.*.zip' => 'required|max:20',
+            ]);
 
-        $employee = Employee::create($validated);
-        if ($request->has('contacts')) {
-            $employee->contacts()->createMany($request->contacts);
+            $employee = $this->employeeRepository->create($validated);
+            return response()->json($employee, 201);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['errors' => $e->errors()], 422);
+        } catch (Exception $e) {
+            \Log::error('Failed to create employee: ' . $e->getMessage());
+            return response()->json(['error' => 'Internal server error'], 500);
         }
-        if ($request->has('addresses')) {
-            $employee->addresses()->createMany($request->addresses);
-        }
-
-        return response()->json($employee->load(['contacts', 'addresses']), 201);
     }
 
     /**
@@ -56,7 +73,17 @@ class EmployeeController extends Controller
      */
     public function show($id)
     {
-        return response()->json($employee->load(['department', 'contacts', 'addresses']), 200);
+        try {
+            $employee = $this->employeeRepository->find($id);
+        
+            return response()->json($employee, 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['error' => 'Employee not found'], 404);
+        } catch (Exception $e) {
+            \Log::error('Failed to retrieve employee: ' . $e->getMessage());
+            return response()->json(['error' => 'Internal server error'], 500);
+        }
+        
     }
 
     /**
@@ -66,7 +93,7 @@ class EmployeeController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, Employee $employee)
     {
         $validated = $request->validate([
             'first_name' => 'required|max:255',
@@ -81,7 +108,7 @@ class EmployeeController extends Controller
             'addresses.*.zip' => 'required|max:20',
         ]);
 
-        $employee->update($validated);
+        $employee->update($request->all());
         if ($request->has('contacts')) {
             $employee->contacts()->delete();
             $employee->contacts()->createMany($request->contacts);
@@ -102,9 +129,16 @@ class EmployeeController extends Controller
      */
     public function destroy($id)
     {
-        $employee->delete();
-
-        return response()->json(null, 204);
+        try {
+            $employee = Employee::findOrFail($id); // Fetch the employee or throw a 404
+            $this->employeeRepository->delete($employee);
+            return response()->json(['message' => 'Employee Deleted Successfully.'], 200);
+        } catch (ModelNotFoundException $e) {
+            return response()->json(['error' => 'Employee not found'], 404);
+        } catch (Exception $e) {
+            \Log::error('Failed to delete employee: ' . $e->getMessage());
+            return response()->json(['error' => 'Internal server error'], 500); 
+        }
     }
 
     public function search($name)

@@ -18,7 +18,6 @@ class EmployeeRepository implements EmployeeRepositoryInterface
 
     public function create(array $data)
     {
-        dd($data);
         $employee = Employee::create($data);
 
         if (isset($data['contacts'])) {

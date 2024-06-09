@@ -107,7 +107,7 @@ class DepartmentController extends Controller
         try {
             $department->delete();
 
-            return response()->json(null, 204); // No content
+            return response()->json(['message' => 'Department Deleted Successfully.'], 200); // No content
         } catch (\Exception $e) {
             return response()->json(['error' => 'Failed to delete department'], 500);
         }
