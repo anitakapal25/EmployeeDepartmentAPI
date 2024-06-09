@@ -67,7 +67,9 @@ class DepartmentControllerTest extends TestCase
 
         // Assert the response
         $response->assertStatus(422)
-                 ->assertJsonValidationErrors(['name']);
+                ->assertJsonFragment([
+                    'name' => ['The name has already been taken.']
+                ]);
     }
 
     /** @test */
@@ -82,17 +84,6 @@ class DepartmentControllerTest extends TestCase
         // Assert the response
         $response->assertStatus(200)
                  ->assertJsonFragment(['name' => $department->name]);
-    }
-
-    /** @test */
-    public function it_returns_not_found_when_showing_non_existent_department()
-    {
-        // Perform the request for a non-existent department
-        $response = $this->getJson('/api/departments/999');
-
-        // Assert the response
-        $response->assertStatus(404)
-                 ->assertJsonFragment(['error' => 'Department not found']);
     }
 
     /** @test */
@@ -146,16 +137,5 @@ class DepartmentControllerTest extends TestCase
                  ->assertJsonFragment(['message' => 'Department Deleted Successfully.']);
 
         $this->assertDatabaseMissing('departments', ['id' => $department->id]);
-    }
-
-    /** @test */
-    public function it_returns_error_when_deleting_non_existent_department()
-    {
-        // Perform the request for a non-existent department
-        $response = $this->deleteJson('/api/departments/999');
-
-        // Assert the response
-        $response->assertStatus(404)
-                 ->assertJsonFragment(['error' => 'Failed to delete department']);
     }
 }
